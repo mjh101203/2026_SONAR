@@ -104,7 +104,7 @@ export default function App() {
   const [result, setResult] = useState(null) // 그래프로 확정된 echo 시간 배열 (µs)
   const [runId, setRunId] = useState(0) // 애니메이션 재생용 key
   const [mode, setMode] = useState('time') // 'time' | 'distance'
-  const [flipped, setFlipped] = useState(false)
+  const [flipped, setFlipped] = useState(true)
   const inputs = useRef([])
 
   const nums = values.map((v) => (v.trim() === '' ? NaN : Number(v)))
