@@ -31,7 +31,7 @@ function niceTicks(min, max, target = 5) {
 const POINT_GAP = 0.22 // 점 하나가 찍히는 간격 (초)
 const LINE_TIME = 1.6 // 선이 이어지는 시간 (초)
 
-function Chart({ data, yLabel, digits, flipped }) {
+function Chart({ data, yLabel, digits, mirrored }) {
   const W = 900
   const H = 470
   const m = { t: 44, r: 36, b: 64, l: 86 }
@@ -42,11 +42,10 @@ function Chart({ data, yLabel, digits, flipped }) {
   const lo = ticks[0]
   const hi = ticks[ticks.length - 1]
 
-  const x = (i) => m.l + (i * iw) / (COUNT - 1)
-  const y = (v) => {
-    const r = (v - lo) / (hi - lo)
-    return flipped ? m.t + r * ih : m.t + ih - r * ih
-  }
+  // 좌우반전이면 첫 측정 위치가 오른쪽 끝에 온다
+  const x = (i) => m.l + ((mirrored ? COUNT - 1 - i : i) * iw) / (COUNT - 1)
+  // 세로축은 뒤집어서 고정: 값이 클수록(멀수록) 아래 → 바닥 지형 모양
+  const y = (v) => m.t + ((v - lo) / (hi - lo)) * ih
   const points = data.map((v, i) => `${x(i)},${y(v)}`).join(' ')
 
   return (
@@ -104,7 +103,7 @@ export default function App() {
   const [result, setResult] = useState(null) // 그래프로 확정된 echo 시간 배열 (µs)
   const [runId, setRunId] = useState(0) // 애니메이션 재생용 key
   const [mode, setMode] = useState('time') // 'time' | 'distance'
-  const [flipped, setFlipped] = useState(true)
+  const [mirrored, setMirrored] = useState(false)
   const inputs = useRef([])
 
   const nums = values.map((v) => (v.trim() === '' ? NaN : Number(v)))
@@ -192,22 +191,21 @@ export default function App() {
                   거리로 환산
                 </button>
               </div>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={flipped}
-                  onChange={(e) => setFlipped(e.target.checked)}
-                />
-                세로축 뒤집기 (바닥 지형처럼 보기)
-              </label>
+              <button
+                className={`mirror${mirrored ? ' on' : ''}`}
+                aria-pressed={mirrored}
+                onClick={() => setMirrored((v) => !v)}
+              >
+                ⇄ 좌우반전
+              </button>
               <button onClick={() => setRunId((k) => k + 1)}>다시 재생</button>
             </div>
             <Chart
-              key={`${runId}-${mode}-${flipped}`}
+              key={`${runId}-${mode}-${mirrored}`}
               data={data}
               yLabel={mode === 'time' ? 'echo 시간 (µs)' : '거리 (cm)'}
               digits={mode === 'time' ? 0 : 1}
-              flipped={flipped}
+              mirrored={mirrored}
             />
             {mode === 'distance' && (
               <p className="note">거리 = 음속(343 m/s) × echo 시간 ÷ 2 — 소리가 갔다가 돌아오므로 2로 나눕니다.</p>

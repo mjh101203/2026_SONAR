@@ -153,6 +153,11 @@ button.primary {
   border-radius: 0 10px 10px 0;
 }
 
+.mirror {
+  margin-right: auto;
+}
+
+.mirror.on,
 .seg button.on {
   color: var(--accent);
   border-color: var(--accent);
