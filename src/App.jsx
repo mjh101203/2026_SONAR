@@ -6,6 +6,10 @@ const COUNT = 9 // 측정 횟수
 const STEP_CM = 5 // 측정 간격 (cm)
 const START_CM = 5 // 첫 측정 위치 (cm)
 const SOUND_CM_PER_US = 0.0343 // 음속 343 m/s (약 20°C 공기)
+const TIME_MIN = 500 // 그래프 세로축 기본 범위 (µs). 범위 밖 값이 있을 때만 넓어진다
+const TIME_MAX = 2000
+const TIME_TICK = 250 // 세로축 눈금 간격 (µs)
+const DIST_TICK = 5 // 거리 환산 시 눈금 간격 (cm)
 // ─────────────────────────────────────────────────────────
 
 const POSITIONS = Array.from({ length: COUNT }, (_, i) => START_CM + i * STEP_CM)
@@ -13,34 +17,44 @@ const POSITIONS = Array.from({ length: COUNT }, (_, i) => START_CM + i * STEP_CM
 // echo 시간은 왕복이므로 거리 = 음속 × 시간 / 2
 const toDistance = (us) => (us * SOUND_CM_PER_US) / 2
 
-function niceTicks(min, max, target = 5) {
-  if (min === max) {
-    min -= 1
-    max += 1
+const range = (from, to, step) => {
+  const out = []
+  for (let v = from; v <= to + 1e-9; v += step) out.push(+v.toFixed(6))
+  return out
+}
+
+// 눈금이 너무 많아지면 간격을 2배씩 넓힌다
+const ticksIn = (lo, hi, base) => {
+  let step = base
+  while ((hi - lo) / step > 8) step *= 2
+  return range(Math.ceil(lo / step - 1e-9) * step, hi, step)
+}
+
+// 세로축: 기본은 TIME_MIN~TIME_MAX 고정, 범위 밖 측정값이 있을 때만 그 값까지 넓힌다.
+// 두 모드 모두 같은 구간을 가리키므로 그래프 모양이 같다.
+function makeAxis(mode, times) {
+  const lo = Math.min(TIME_MIN, Math.floor(Math.min(...times) / TIME_TICK) * TIME_TICK)
+  const hi = Math.max(TIME_MAX, Math.ceil(Math.max(...times) / TIME_TICK) * TIME_TICK)
+  if (mode === 'time') {
+    return { label: 'echo 시간 (µs)', digits: 0, domain: [lo, hi], ticks: ticksIn(lo, hi, TIME_TICK) }
   }
-  const raw = (max - min) / target
-  const mag = 10 ** Math.floor(Math.log10(raw))
-  const step = [1, 2, 5, 10].map((m) => m * mag).find((s) => s >= raw)
-  const lo = Math.floor(min / step) * step
-  const hi = Math.ceil(max / step) * step
-  const ticks = []
-  for (let v = lo; v <= hi + step / 2; v += step) ticks.push(+v.toFixed(6))
-  return ticks
+  const dLo = toDistance(lo)
+  const dHi = toDistance(hi)
+  return { label: '거리 (cm)', digits: 1, domain: [dLo, dHi], ticks: ticksIn(dLo, dHi, DIST_TICK) }
 }
 
 const POINT_GAP = 0.22 // 점 하나가 찍히는 간격 (초)
 const LINE_TIME = 1.6 // 선이 이어지는 시간 (초)
 
-function Chart({ data, yLabel, digits, mirrored }) {
+function Chart({ data, axis, mirrored }) {
+  const { label: yLabel, digits, domain, ticks } = axis
   const W = 900
   const H = 470
   const m = { t: 44, r: 36, b: 64, l: 86 }
   const iw = W - m.l - m.r
   const ih = H - m.t - m.b
 
-  const ticks = niceTicks(Math.min(...data), Math.max(...data))
-  const lo = ticks[0]
-  const hi = ticks[ticks.length - 1]
+  const [lo, hi] = domain
 
   // 좌우반전이면 첫 측정 위치가 오른쪽 끝에 온다
   const x = (i) => m.l + ((mirrored ? COUNT - 1 - i : i) * iw) / (COUNT - 1)
@@ -203,8 +217,7 @@ export default function App() {
             <Chart
               key={`${runId}-${mode}-${mirrored}`}
               data={data}
-              yLabel={mode === 'time' ? 'echo 시간 (µs)' : '거리 (cm)'}
-              digits={mode === 'time' ? 0 : 1}
+              axis={makeAxis(mode, result)}
               mirrored={mirrored}
             />
             {mode === 'distance' && (
